@@ -12,7 +12,7 @@ HEADERS = {
 
 # First we will defin function to scrape links from each page 
 def get_page_data(page_number):
-    URL = f'https://getintopc.com/page/{page_number}/?0'
+    URL = f'https://getintopc.com/softwares/page/{page_number}/'
     response = requests.get(URL, headers=HEADERS)
 
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -28,12 +28,12 @@ def get_page_data(page_number):
         categories.append((", ".join([cat.string for cat in cat_a_tags])))
     
     
-    unfiltered = zip(names, links, categories)
-    filtered = [item for item in unfiltered if item[2].lower() not in ('tutorials', 'reviews')]
+    # unfiltered = zip(names, links, categories)
+    # filtered = [item for item in unfiltered if item[2].lower() not in ('tutorials', 'reviews')]
     
-    names = [item[0] for item in filtered]
-    links = [item[1] for item in filtered]
-    categories = [item[2] for item in filtered]
+    # names = [item[0] for item in filtered]
+    # links = [item[1] for item in filtered]
+    # categories = [item[2] for item in filtered]
     # print(categories)
     return names, links, categories
 
@@ -42,7 +42,11 @@ def get_app_info(app_link):
     response = requests.get(URL, headers=HEADERS)
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    div_content = soup.find_all('')
+    div_content = soup.find('div', {'class', 'post-content clear-block'})
+    ps_in_content = div_content.select('h2 ~ p')
+    print((len(ps_in_content)))
+    descriptive_text = []
+
 
 def main():
     page_number = 1
@@ -50,6 +54,8 @@ def main():
         names, links, categories = get_page_data(page_number)
         for name, link, cat in zip(names, links, categories):
             get_app_info(link)
+            break
+        break
 
 if __name__ == '__main__':
     main()
