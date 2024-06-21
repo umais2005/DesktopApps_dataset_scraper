@@ -1,10 +1,9 @@
 import re
-import time
-import random
-import asyncio
+import concurrent.futures
 import numpy as np
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+import  asyncio
 
 def fetch_html_with_playwright(url):
     with sync_playwright() as p:
@@ -31,15 +30,6 @@ def fetch_html_with_playwright(url):
         # Close browser
         browser.close()
         return html_content
-async def fetch_multiple_pages(urls):
-    tasks = [fetch_html_with_playwright(url) for url in urls]
-    results = await asyncio.gather(*tasks)
-    return results
-
-async def fetch_multiple_pages(links):
-    tasks = [get_app_info(link) for link in links]
-    page_results = await asyncio.gather(*tasks)
-    return page_results
 
 def save_html(html_content):
     with open('page_content.html', 'w', encoding='utf-8') as file:
@@ -129,6 +119,9 @@ def get_app_info(app_link, app_category):
                                  hdd_space=hdd_space,
                                  cpu=cpu)
         app_dict = description_dict | features_dict | requirements_dict | details_dict
+        n_items = len([item for item in list(app_dict.values()) if item])
+        # print(list(app_dict.values())[2:])
+        print(f"fetched {n_items} out of 13")
         # print("{} Saved details for {}".format(app_dict.keys(),name))
         return app_dict
     except AttributeError as e:
@@ -138,19 +131,23 @@ def get_app_info(app_link, app_category):
         # return
 
 def main():
-    for page_number in range(32, 35):
+    for page_number in PAGE_RANGE:
         links, categories = get_page_data(page_number)
         # print(asyncio.run(fetch_multiple_pages(links)))
         print("Page Fetched {}\n".format('Success' if bool(links) else "Failed"))
+        print(links, categories)
         if bool(links):
             for link, cat in zip(links, categories):
                 app_dict = get_app_info(link, cat)
-                n_items = len([item for item in list(app_dict.values()) if item])
-                # print(list(app_dict.values())[2:])
-                print(f"fetched {n_items} out of 13")
+                return app_dict
+        return
 
 
 if __name__ == '__main__':
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
+    #     executor.map(process_page, PAGE_RANGE)
+    # print(apps)
+    PAGE_RANGE = range(0,2)
     main()
     # (get_app_info('https://getintopc.com/softwares/backup-recovery/advik-gmail-backup-enterprise-2022-free-download/'))
     # page_number = 4
