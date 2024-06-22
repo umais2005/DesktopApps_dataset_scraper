@@ -15,7 +15,6 @@ logging.basicConfig(
 )
 
 
-
 # First we will define function to scrape links from each page
 def get_page_links(page_number):
     logging.info("Fetching app links from page {}".format(page_number))
