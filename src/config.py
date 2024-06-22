@@ -1,0 +1,4 @@
+MAX_PAGES = 100
+
+PAGE_RANGE = range(MAX_PAGES)
+
