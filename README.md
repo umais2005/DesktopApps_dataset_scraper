@@ -1,6 +1,6 @@
 # DesktopApps_dataset_scraper
 
-This app scrapes all of desktop apps published (available from getintopc.com) and saves them in json format page by page and altogether.
+This app scrapes all of over 10000 desktop apps published (available from getintopc.com) and saves them in json format page by page and altogether.
 
 This has been made using Python and its libraries like Beautifulsoup, Playwright, json, logging, re.
 
