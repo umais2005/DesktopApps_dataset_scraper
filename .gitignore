@@ -160,3 +160,7 @@ cython_debug/
 #.idea/
 /.idea
 *.exe
+/data/raw
+data/raw/apps.json
+data/raw/apps.json
+*.json
