@@ -9,7 +9,7 @@ logging.basicConfig(
     level=logging.INFO,  # Set the logging level
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Format of the log messages
     handlers=[
-        logging.FileHandler('data/logging/logs/app.log'),  # Log to a file
+        logging.FileHandler('../data/logging/logs/app.log'),  # Log to a file
         logging.StreamHandler()          # Log to the console
     ]
 )
@@ -64,7 +64,7 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
             assert len(app_details) == 6
         except AssertionError:
             if len(app_details) < 6: # Making sure details match with names
-                app_details = app_details + [np.nan] * (6 - len(app_details))
+                app_details = app_details + [None] * (6 - len(app_details))
             elif len(app_details) > 6:
                 app_details = app_details[:6]
         finally:
