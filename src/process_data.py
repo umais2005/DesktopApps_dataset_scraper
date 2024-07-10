@@ -9,7 +9,7 @@ logging.basicConfig(
     level=logging.INFO,  # Set the logging level
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Format of the log messages
     handlers=[
-        logging.FileHandler('../data/logging/logs/app.log'),  # Log to a file
+        logging.FileHandler('../data/logging/app.log'),  # Log to a file
         logging.StreamHandler()          # Log to the console
     ]
 )
@@ -24,6 +24,9 @@ def get_page_links(page_number):
 
     a_tags = soup.find_all('a', attrs={'class', 'post-thumb'})
     links = [link['href'] for link in a_tags]
+    imgs = [a_tag.find('img') for a_tag in a_tags]
+    img_links = [img['src'] for img in imgs]
+
     categories = []
     divs_post_info = soup.find_all('div', {'class':'post-info'})
     for div in divs_post_info:
@@ -35,10 +38,11 @@ def get_page_links(page_number):
         logging.warning(f'No links found for page {page_number}')
     else:
         logging.info("Page {} Fetched {}".format(page_number, 'Success' if bool(links) else "Failed"))
-    return links, categories
+        print(len(img_links))
+    return links, categories, img_links
 
 
-def get_app_info(app_link, app_category): # Scrapes app details from app page
+def get_app_info(app_link, app_category, img_link): # Scrapes app details from app page
     html = fetch_html_with_playwright(app_link)
     soup = BeautifulSoup(html, 'html.parser')
     # print(soup)
@@ -112,10 +116,11 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
                                  ram_required=ram_required,
                                  hdd_space=hdd_space,
                                  cpu=cpu,
+                                 img_link=img_link
                                  )
         app_dict = details_dict | requirements_dict | description_dict | features_dict
         n_items = len([item for item in list(app_dict.values()) if item])
-        logging.debug(f"fetched {n_items} out of 13 for {name}")
+        logging.debug(f"fetched {n_items} out of 14 for {name}")
     except Exception as e:
         # To see what's wrong with the html that is causing errors
         logging.error(f"fetching app details failed: {e}")
@@ -125,10 +130,10 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
 
 def process_page(page_number):
     page_apps = []
-    links, categories = get_page_links(page_number)
+    links, categories, img_links = get_page_links(page_number)
     if bool(links):
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(lambda link, cat: page_apps.append(get_app_info(link, cat)), links, categories)
+            executor.map(lambda link, cat, img_link: page_apps.append(get_app_info(link, cat, img_link)), links, categories, img_links)
     filename = save_json([page_app for page_app in page_apps if page_app], page_number, by_page=True)
     if filename: logging.info(f"Data successfully written to {filename}\n")
     # returns list of dicts
@@ -136,4 +141,7 @@ def process_page(page_number):
 
 
 if __name__ == '__main__':
-    print(get_app_info(r'https://getintopc.com/softwares/music/atomix-virtualdj-pro-infinity-portable-free-download/'))
+    # print(get_app_info(r'https://getintopc.com/softwares/music/atomix-virtualdj-pro-infinity-portable-free-download/'))
+    # app, cat, link = get_page_links(1)
+    # get_app_info(app[0], cat[0], link[0])
+    process_page(1)

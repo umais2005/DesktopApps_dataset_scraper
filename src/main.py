@@ -12,4 +12,4 @@ def main(page_range):
 
 if __name__ == '__main__':
     page_range = config.PAGE_RANGE
-    main(range(1))
+    main(page_range)
