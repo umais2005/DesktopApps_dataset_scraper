@@ -50,6 +50,7 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
         page_text = [p.text for p in ps_in_content if len(p.text) > 250]
         app_desc = " ".join(page_text).strip()
         description_dict = dict(desc= app_desc)
+
         # This is for the features
         app_features_ul = div_content.find('ul')
         features_list = [feature.text for feature in app_features_ul.find_all('li')]
@@ -58,8 +59,23 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
 
         # For details
         app_details_ul = app_features_ul.find_next_sibling('ul')
-        details_list = [detail.text.split(":",1)[-1].strip() for detail in app_details_ul.find_all('li')]
-        app_details = details_list[:1] + details_list[2:]
+        details_li = app_details_ul.find_all('li')
+        domain_name_regex = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+)(?:\.[a-zA-Z]{2,}){1,2}'
+        details = []
+        for detail in details_li:
+            link = detail.find('a')
+            if link:
+                if link.text.lower() != "homepage":
+                    developer = link.text
+                else:
+                    developer = (re.findall(domain_name_regex, detail.find('a').get('href')))[0]
+                details.append(developer)
+            else:
+                detail = (detail.text.split(":",1)[-1].strip())
+                details.append(detail)
+
+        # details = [detail.text.split(":",1)[-1].strip() for detail in details_li]
+        app_details = details[:1] + details[2:]
         try:
             assert len(app_details) == 6
         except AssertionError:
@@ -77,6 +93,7 @@ def get_app_info(app_link, app_category): # Scrapes app details from app page
                             setup_type=setup_type,
                             compatibility=compatibility,
                             )
+        
         # For System requirements
         pattern = re.compile(r'\b(?:' + '|'.join(["operating", "system",
                                                   "memory", "ram", "hard", "disk", "space", "processor",
@@ -116,3 +133,7 @@ def process_page(page_number):
     if filename: logging.info(f"Data successfully written to {filename}\n")
     # returns list of dicts
     return page_apps
+
+
+if __name__ == '__main__':
+    print(get_app_info(r'https://getintopc.com/softwares/music/atomix-virtualdj-pro-infinity-portable-free-download/'))
