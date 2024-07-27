@@ -1,36 +1,43 @@
-from bs4 import BeautifulSoup
-from  html_getter import fetch_html_with_playwright, fetch_html_with_requests
-from utils import  save_json
-import numpy as np
-import re
-import concurrent.futures
+import asyncio
 import logging
+from playwright.async_api import async_playwright
+from process_data import get_page_links
+from utils import save_json_async, save_json
 import time
-import random
+import re 
+import numpy as np
+from bs4 import BeautifulSoup
+# Assuming get_page_links and save_json are already defined elsewhere
 
+async def fetch_html_with_async_playwright(url):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            viewport={"width": 1280, "height": 800},
+            ignore_https_errors=True
+        )
 
+        await context.route("**/*", lambda route, request: asyncio.create_task(route.abort()) if request.resource_type in ["image", "stylesheet", "font"] else asyncio.create_task(route.continue_()))
 
-logging.basicConfig(
-    level=logging.INFO,  # Set the logging level
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Format of the log messages
-    handlers=[
-        logging.FileHandler('../data/logging/app.log'),  # Log to a file
-        logging.StreamHandler()          # Log to the console
-    ]
-)
+        page = await context.new_page()
+        await page.goto(url, wait_until='networkidle')
+        html_content = await page.content()
 
-
-# First we will define function to scrape links from each page
-def get_page_links(page_number):
+        await browser.close()
+        print(html_content[:10])
+        return html_content
+    
+async def get_page_links_async(page_number):
     logging.info("Fetching app links from page {}".format(page_number))
     url = f'https://getintopc.com/softwares/page/{page_number}/'
-    page_html_content = fetch_html_with_requests(url)
+    page_html_content = await fetch_html_with_async_playwright(url)
     soup = BeautifulSoup(page_html_content, 'html.parser')
 
     a_tags = soup.find_all('a', attrs={'class', 'post-thumb'})
     links = [link['href'] for link in a_tags]
     imgs = [a_tag.find('img') for a_tag in a_tags]
-    img_links = [img['src'] if img else None for img in imgs]
+    img_links = [img['src'] for img in imgs]
 
     categories = []
     divs_post_info = soup.find_all('div', {'class':'post-info'})
@@ -46,13 +53,11 @@ def get_page_links(page_number):
         print(len(img_links))
     return links, categories, img_links
 
-
-def get_app_info(app_link, app_category, img_link): # Scrapes app details from app page
-    delay = random.uniform(1, 3)
-    time.sleep(delay)
-
-    html = fetch_html_with_requests(app_link)
+async def get_app_info_async(link, app_category, img_link):
+    html = await fetch_html_with_async_playwright(link)
     soup = BeautifulSoup(html, 'html.parser')
+    print(f"Processing App from {link}")
+    
     # print(soup)
     try:
         div_content = soup.find('div', {'class', 'post-content clear-block'})
@@ -70,8 +75,7 @@ def get_app_info(app_link, app_category, img_link): # Scrapes app details from a
         features_dict = dict(features=features_text)
 
         # For details
-        details_h_or_p  = soup.find(lambda tag: tag.name in ['h2', 'p'] and 'technical' in tag.get_text().lower())
-        app_details_ul = details_h_or_p.find_next_sibling('ul')
+        app_details_ul = app_features_ul.find_next_sibling('ul')
         details_li = app_details_ul.find_all('li')
         domain_name_regex = r'(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+)(?:\.[a-zA-Z]{2,}){1,2}'
         details = []
@@ -112,8 +116,7 @@ def get_app_info(app_link, app_category, img_link): # Scrapes app details from a
                                                   "memory", "ram", "hard", "disk", "space", "processor",
                                                   "intel"]) + r')\b', re.IGNORECASE)
         try:
-            requirements_h_or_p  = soup.find(lambda tag: tag.name in ['h2', 'p'] and 'requirements' in tag.get_text().lower())
-            requirements_ul = requirements_h_or_p.find_next_sibling('ul')
+            requirements_ul = app_details_ul.find_next_sibling('ul')
             assert bool(requirements_ul) == True
         except AssertionError:
             app_requirements = [np.nan] * 4
@@ -121,16 +124,13 @@ def get_app_info(app_link, app_category, img_link): # Scrapes app details from a
             app_requirements = [requirement.text for requirement in requirements_ul.find_all('li')]
             app_requirements = [requirement.split(":")[-1].strip() for requirement in app_requirements]
 
-        operating_system, ram_required, hdd_space, cpu, *extras = app_requirements
+        operating_system, ram_required, hdd_space, cpu = app_requirements
         requirements_dict = dict(operating_system=operating_system,
                                  ram_required=ram_required,
                                  hdd_space=hdd_space,
                                  cpu=cpu,
                                  img_link=img_link
                                  )
-        for i, extra in enumerate(extras, start=1):
-            requirements_dict[f'extra_{i}'] = extra
-
         app_dict = details_dict | requirements_dict | description_dict | features_dict
         n_items = len([item for item in list(app_dict.values()) if item])
         logging.debug(f"fetched {n_items} out of 14 for {name}")
@@ -140,33 +140,40 @@ def get_app_info(app_link, app_category, img_link): # Scrapes app details from a
         return None
     return app_dict
 
-
-def process_page(page_number):
+async def process_page(page_number: int):
     page_apps = []
-    links, categories, img_links = get_page_links(page_number)
+    
+    # Fetch page links asynchronously
+    links, categories, img_links = await get_page_links_async(page_number)
     
     if links:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit tasks for each link
-            futures = []
-            for link, cat, img_link in zip(links, categories, img_links):
-                futures.append(executor.submit(get_app_info, link, cat, img_link))
-            
-            # Gather results as they complete
-            for future in concurrent.futures.as_completed(futures):
-                app_info = future.result()
-                if app_info:
-                    page_apps.append(app_info)
+        # Create tasks to fetch app info asynchronously
+        tasks = [get_app_info_async(link, cat, img_link) for link, cat, img_link in zip(links, categories, img_links)]
+        
+        # Gather results concurrently
+        page_apps = await asyncio.gather(*tasks)
     
-    filename = save_json(page_apps, page_number, by_page=True)
+    # Save JSON asynchronously
+    filename = await save_json_async([app for app in page_apps if app], page_number, by_page=True)
+    
     if filename:
         logging.info(f"Data successfully written to {filename}\n")
     
     return page_apps
 
+async def process_pages_concurrently(page_range: range):
+    all_apps = []
+    tasks = [process_page(page_num) for page_num in page_range]
+    apps = await asyncio.gather(*tasks)
+    print(type(app) for app in apps)
+    all_apps.extend(apps)
+    save_json(all_apps)
+    # Optionally, do something with all_apps if needed
+    logging.info("All pages processed\n")
 
-if __name__ == '__main__':
-    # print(get_app_info(r'https://getintopc.com/softwares/music/atomix-virtualdj-pro-infinity-portable-free-download/'))
-    app, cat, link = get_page_links(3038)
-    print(get_app_info('https://getintopc.com/softwares/utilities/java-free-download/', "category", "img"))
-    # process_page(1)
+async def main():
+    page_range = range(5)  # Example page range
+    await process_pages_concurrently(page_range)
+
+if __name__ == "__main__":
+    asyncio.run(main())
