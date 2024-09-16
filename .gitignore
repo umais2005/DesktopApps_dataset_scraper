@@ -166,3 +166,7 @@ data/raw/apps.json
 *.json
 /data
 /data
+/scraper/.idea
+/src/.idea
+models/cos_matrix.pkl
+models/embeddings.pkl
