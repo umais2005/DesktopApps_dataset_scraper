@@ -1,31 +1,28 @@
-# %%
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-import matplotlib.pyplot as plt
 import pickle
 
-### THis file makes the cosine_matrix using embedding model from huggingface
+def create_embeddings_from_nlp_df(colname):
 
-# %%
-df = pd.read_csv("nlp_df.csv")
+    df = pd.read_csv("../data/processed/nlp.csv")
+    df = df.iloc[:,2:]
 
-# %%
-df = df.iloc[:,2:]
+    col_values = df[colname].astype(str).values
 
-# %%
-# %%
-features = list(df['features'].values)
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    print("making embeddings")
+    # Convert descriptions/features to embeddings
+    embeddings = model.encode(col_values)
+    cos_matrix = cosine_similarity(embeddings)
+    print("embeddings done")
+    with open(f"{colname}_cos_matrix.pkl", 'wb') as e:
+        pickle.dump(cos_matrix, e)
 
-# %%
-model = SentenceTransformer('all-MiniLM-L6-v2')
+    with open(f"{colname}_embeddings.pkl", 'wb') as e:
+        pickle.dump(embeddings, e)
 
-# Convert descriptions to embeddings
-embeddings = model.encode(features)
-cos_matrix = cosine_similarity(embeddings)
+    return embeddings, cos_matrix
 
-with open("cos_matrix.pkl", 'wb') as e:
-    pickle.dump(cos_matrix, e)
-
-with open("embeddings.pkl", 'wb') as e:
-    pickle.dump(embeddings, e)
+if __name__ == "__main__":
+    create_embeddings_from_nlp_df('desc')

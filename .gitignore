@@ -170,3 +170,4 @@ data/raw/apps.json
 /src/.idea
 models/cos_matrix.pkl
 models/embeddings.pkl
+*.pkl
